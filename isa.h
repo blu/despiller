@@ -8,7 +8,7 @@
 
 // Fake ISA whose sole purpose is to demonstrate the effect of de-spilling
 
-// This ISA has an unspecified-size GPR file R0..Rn, but it also has an unlimited storage space 'storage'
+// This ISA has an unspecified-size GPR file R0..Rn, and an unlimited storage space 'storage'
 // where regs can be spilled -- i.e. stored to and eventually restored from, in a LIFO manner
 
 namespace isa {
@@ -27,25 +27,37 @@ enum Opcode : uint8_t {
 	op__count
 };
 
-typedef uint8_t Register;
+// operands -- usually register identifiers
+typedef uint8_t Operand;
 
 constexpr Opcode op_invalid = static_cast< Opcode >(uint8_t(-1));
-constexpr Register reg_invalid = Register(-1);
+constexpr Operand reg_invalid = Operand(-1);
+
+// check opcode validity
+inline bool isOpcodeValid(const uint8_t op)
+{
+	return op < op__count;
+}
 
 class Instr {
-	constexpr static size_t MAX_OPERAND_COUNT = 3;
+	constexpr static size_t MAX_OPERAND_COUNT = 3; // non-negotiable symbolic constant
 	Opcode op; // instruction opcode
-	Register r[MAX_OPERAND_COUNT]; // instruction operands, 1st through last (reg-invalid for operands past the last)
-	// For opcode 'li', r[0] contains the destination, whereas r[1..2] contain an immediate value, little endian
+	Operand r[MAX_OPERAND_COUNT]; // instruction operands, 1st through last (reg-invalid for operands past the last)
+	// For opcode 'li', r[0] contains the destination, whereas r[1..2] contain a little-endian immediate value
 
 public:
-	Instr(const Opcode op) : op(op) {}
-	Opcode getOp() const;
-	Register getOperand(const size_t index) const;
-	void setOperand(const size_t index, const Register reg, const bool invalidateRest = false);
+	explicit Instr(const Opcode op) : op(op) {}
+	// get instruction opcode
+	Opcode getOpcode() const;
+	// get instruction operand at specified index
+	Operand getOperand(const size_t index) const;
+	// set instruction operand at specified index; optionally invalidate the remaining operands
+	void setOperand(const size_t index, const Operand reg, const bool invalidateRest = false);
+	// get instruction immediate operand
+	int32_t getImm() const;
 };
 
-inline Opcode Instr::getOp() const
+inline Opcode Instr::getOpcode() const
 {
 	switch (op) {
 	case op_nop:
@@ -81,13 +93,13 @@ inline Opcode Instr::getOp() const
 	return op_invalid;
 }
 
-inline Register Instr::getOperand(const size_t index) const
+inline Operand Instr::getOperand(const size_t index) const
 {
 	assert(index < MAX_OPERAND_COUNT);
 	return r[index];
 }
 
-void Instr::setOperand(const size_t index, Register reg, const bool invalidateRest)
+inline void Instr::setOperand(const size_t index, const Operand reg, const bool invalidateRest)
 {
 	assert(index < MAX_OPERAND_COUNT);
 	r[index] = reg;
@@ -96,6 +108,12 @@ void Instr::setOperand(const size_t index, Register reg, const bool invalidateRe
 		for (size_t i = index + 1; i < MAX_OPERAND_COUNT; ++i)
 			r[i] = reg_invalid;
 	}
+}
+
+inline int32_t Instr::getImm() const
+{
+	assert(op_li == op);
+	return int16_t(uint16_t(r[1]) + (uint16_t(r[2]) << 8));
 }
 
 inline const char* strFromOpcode(const Opcode op)
@@ -128,10 +146,9 @@ extern "C" {
 
 static size_t strFromInstr(const Instr& instr, char* buffer, const size_t bufferSize)
 {
-	const Opcode op = instr.getOp();
+	const Opcode op = instr.getOpcode();
 	const char* const strop = strFromOpcode(op);
 
-	constexpr unsigned regLimit = 0x10000;
 	const size_t stroplen = strlen(strop);
 	size_t minBufferSize = stroplen;
 	size_t noperand = 0;
@@ -139,29 +156,24 @@ static size_t strFromInstr(const Instr& instr, char* buffer, const size_t buffer
 	// determine operand count and textual footprint
 	switch (op) {
 	case op_li:
-		assert(regLimit > instr.getOperand(0));
-		minBufferSize += strlen("\t0000, 0x0000");
+		minBufferSize += strlen("\t0000, 0x00000000");
 		noperand = 1;
 		break;
 	case op_push:
 	case op_pop:
 	case op_br:
-		assert(regLimit > instr.getOperand(0));
 		minBufferSize += strlen("\t0000");
 		noperand = 1;
 		break;
 	case op_cbr:
-		assert(regLimit > instr.getOperand(0) && regLimit > instr.getOperand(1) && regLimit > instr.getOperand(2));
 		minBufferSize += strlen("\t0000, 0000, 0000");
 		noperand = 3;
 		break;
 	case op_op2:
-		assert(regLimit > instr.getOperand(0) && regLimit > instr.getOperand(1));
 		minBufferSize += strlen("\t0000, 0000");
 		noperand = 2;
 		break;
 	case op_op3:
-		assert(regLimit > instr.getOperand(0) && regLimit > instr.getOperand(1) && regLimit > instr.getOperand(2));
 		minBufferSize += strlen("\t0000, 0000, 0000");
 		noperand = 3;
 		break;
@@ -182,15 +194,15 @@ static size_t strFromInstr(const Instr& instr, char* buffer, const size_t buffer
 				string_x16(buffer + pos, instr.getOperand(i));
 				pos += 4;
 			}
-		}
-		if (op_li == op) {
-			const uint32_t imm = uint32_t(instr.getOperand(1)) + (uint32_t(instr.getOperand(2)) << 8);
-			buffer[pos++] = ',';
-			buffer[pos++] = ' ';
-			buffer[pos++] = '0';
-			buffer[pos++] = 'x';
-			string_x16(buffer + pos, imm);
-			pos += 4;
+
+			if (op_li == op) {
+				buffer[pos++] = ',';
+				buffer[pos++] = ' ';
+				buffer[pos++] = '0';
+				buffer[pos++] = 'x';
+				string_x32(buffer + pos, instr.getImm());
+				pos += 8;
+			}
 		}
 		// terminate
 		assert(pos == minBufferSize);

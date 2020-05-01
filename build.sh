@@ -18,5 +18,5 @@ else
 fi
 
 as stringx.s -o stringx.o
-clang++-7 main.cpp -Wno-switch -Wno-logical-op-parentheses -fno-rtti -fno-exceptions ${OPT_FLAGS[@]} -c -o main.o
+clang++-7 main.cpp -Wno-switch -Wno-logical-op-parentheses -Wno-shift-op-parentheses -fno-rtti -fno-exceptions ${OPT_FLAGS[@]} -c -o main.o
 clang++-7 main.o stringx.o -o hello
