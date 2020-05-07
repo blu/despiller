@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <vector>
+#include <utility>
 #include "isa.h"
 
 // Basic block -- a block of instructions executed sequentially
@@ -40,7 +41,8 @@ class BasicBlock {
 
 public:
 	explicit BasicBlock(const Address start) : start(start), exit{ addr_invalid, addr_invalid } {}
-	BasicBlock(BasicBlock&&);
+	BasicBlock(const BasicBlock&) = default;
+	BasicBlock(BasicBlock&&) = default;
 	// get start address of the basic block
 	Address getStartAddress() const;
 	// get one of the branch targets at the exit of the basic block
@@ -54,11 +56,6 @@ public:
 	// check the validity of the basic block
 	bool validate();
 };
-
-inline BasicBlock::BasicBlock(BasicBlock&& src)
-: start(src.start)
-, instr(std::move(src.instr))
-{}
 
 inline Address BasicBlock::getStartAddress() const
 {

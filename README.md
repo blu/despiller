@@ -12,4 +12,4 @@ De-spilling works by tracking register occupancy across the control-flow graph (
 As de-spilling is a very conservative optimisation technique, it could be applied to program binaries post compile.
 
 # limitations
-This proof of concept does not handle non-deterministic branch targets -- i.e. targets which cannot be computed via static analysis, e.g. targets of virtual calls.
+This proof of concept does not handle non-deterministic branch targets -- i.e. targets which cannot be computed via static analysis, e.g. targets of virtual or dispatch calls.
