@@ -132,7 +132,8 @@ int main(int, char **)
 			block.addInstr(instr);
 		}
 		block.validate();
-		graph.addBasicBlock(std::move(block));
+		const bool success = graph.addBasicBlock(std::move(block));
+		assert(success);
 	}
 
 	// second basic block -- once our callee is done we return to our caller
@@ -150,7 +151,8 @@ int main(int, char **)
 			block.addInstr(instr);
 		}
 		block.validate();
-		graph.addBasicBlock(std::move(block));
+		const bool success = graph.addBasicBlock(std::move(block));
+		assert(success);
 	}
 
 	const AddressColor color[] = {

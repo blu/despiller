@@ -15,7 +15,7 @@ class ControlFlowGraph : std::map< bb::Address, bb::BasicBlock > { // TODO: chan
 	const map& basecast() const { return *static_cast< const map* >(this); }
 
 public:
-	void addBasicBlock(bb::BasicBlock&&);
+	bool addBasicBlock(bb::BasicBlock&&);
 	bb::BasicBlock* getBasicBlock(const bb::Address);
 	const bb::BasicBlock* getBasicBlock(const bb::Address) const;
 
@@ -24,11 +24,50 @@ public:
 	const_iterator end() const;
 };
 
-inline void ControlFlowGraph::addBasicBlock(bb::BasicBlock&& bb)
+inline bool ControlFlowGraph::addBasicBlock(bb::BasicBlock&& bb)
 {
-	assert(bb::isAddressValid(bb.getStartAddress()));
-	assert(find(bb.getStartAddress()) == end());
+	using namespace bb;
+	const Address bbAddress = bb.getStartAddress();
+	assert(isAddressValid(bbAddress));
+
+	struct Interval {
+		Address begin;
+		Address end;
+
+		bool overlap(const Interval& oth) const {
+			return begin < oth.end && oth.begin < end;
+		}
+	};
+
+	const Interval incoming = { .begin = bbAddress, .end = bbAddress + Address(bb.getSequence().size()) };
+	const std::pair< const_iterator, const_iterator > range = equal_range(bbAddress);
+
+	// check preceding elemets for address overlaps
+	for (const_reverse_iterator it = std::make_reverse_iterator<const_iterator>(range.first); it != rend(); ++it) {
+		const Address presentAddr = it->second.getStartAddress();
+		const Interval present = { .begin = presentAddr, .end = presentAddr + Address(it->second.getSequence().size()) };
+
+		if (incoming.begin >= present.end)
+			break;
+
+		if (incoming.overlap(present))
+			return false;
+	}
+
+	// check succeeding elements for address overlaps
+	for (const_iterator it = range.second; it != end(); ++it) {
+		const Address presentAddr = it->second.getStartAddress();
+		const Interval present = { .begin = presentAddr, .end = presentAddr + Address(it->second.getSequence().size()) };
+
+		if (present.begin >= incoming.end)
+			break;
+
+		if (present.overlap(incoming))
+			return false;
+	}
+
 	insert(value_type(bb.getStartAddress(), std::move(bb)));
+	return true;
 }
 
 inline bb::BasicBlock* ControlFlowGraph::getBasicBlock(const bb::Address start)
