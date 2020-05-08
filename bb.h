@@ -35,12 +35,13 @@ inline Address revalidateAddress(const Address addr)
 }
 
 class BasicBlock {
-	Address start; // basic-block start address
+	const Address start; // basic-block start address
 	Address exit[2]; // two potential branch targets for exit from the basic block (two when the BB ends with a conditional branch)
+	Address flag_valid : 1;
 	Instructions instr; // basic-block instructions
 
 public:
-	explicit BasicBlock(const Address start) : start(start), exit{ addr_invalid, addr_invalid } {}
+	explicit BasicBlock(const Address start) : start(start), exit{ addr_invalid, addr_invalid }, flag_valid(false) { assert(isAddressValid(start)); }
 	BasicBlock(const BasicBlock&) = default;
 	BasicBlock(BasicBlock&&) = default;
 	// get start address of the basic block
@@ -55,6 +56,7 @@ public:
 	void replaceInstr(const size_t index, const isa::Instr newInstr);
 	// check the validity of the basic block
 	bool validate();
+	bool isValid() const { return flag_valid; }
 };
 
 inline Address BasicBlock::getStartAddress() const
@@ -73,20 +75,15 @@ inline const Instructions& BasicBlock::getSequence() const
 	return instr;
 }
 
-inline bool isBranch(const isa::Opcode op)
-{
-	using namespace isa;
-
-	return op == op_br || op == op_cbr;
-}
-
 inline void BasicBlock::addInstr(const isa::Instr& newInstr)
 {
+	flag_valid = false;
 	instr.push_back(newInstr);
 }
 
 inline void BasicBlock::replaceInstr(const size_t index, const isa::Instr newInstr)
 {
+	flag_valid = false;
 	assert(index < instr.size());
 	instr[index] = newInstr;
 }
@@ -108,10 +105,8 @@ inline bool BasicBlock::validate()
 			break;
 	}
 
-	if (!isOpcodeValid(op) || it != itend && ++it != itend) {
-		start = invalidateAddress(start);
+	if (!isOpcodeValid(op) || it != itend && ++it != itend)
 		return false;
-	}
 
 	// unless ending with an unconditional branch, one of the branch
 	// targets out of this BB is the first address immediately after
@@ -119,6 +114,7 @@ inline bool BasicBlock::validate()
 	exit[0] = op_br != instr.back().getOpcode() ? start + instr.size() : addr_invalid;
 	exit[1] = addr_invalid;
 
+	flag_valid = true;
 	return true;
 }
 

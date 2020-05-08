@@ -15,30 +15,36 @@ void print(FILE* f, const bb::BasicBlock& block, const AddressColor addrcolor = 
 {
 	using namespace bb;
 
+	if (!block.isValid() && addrcolor_err != addrcolor) {
+		fprintf(f, "invalid basic block\n");
+		return;
+	}
+
 	char buffer[128];
 	constexpr size_t bufferSize = sizeof(buffer);
+
+	const char* format_color[] = { // all entries must contain an %x followed by an %s
+		"\033[38;5;13m%08x\033[0m\t%s\n",
+		"\033[38;5;8m%08x\033[0m\t%s\n",
+		"\033[38;5;15m%08x\033[0m\t%s\n"
+	};
+	const char* const format = format_color[uint8_t(addrcolor)];
 	Address addr = block.getStartAddress();
 
-	if (isAddressValid(addr)) {
-		const char* format_color[] = { // all entries must contain an %x followed by an %s
-			"\033[38;5;13m%08x\033[0m\t%s\n",
-			"\033[38;5;8m%08x\033[0m\t%s\n",
-			"\033[38;5;15m%08x\033[0m\t%s\n"
-		};
-		const char* const format = format_color[uint8_t(addrcolor)];
-
-		for (const auto it : block.getSequence()) {
-			const size_t checkSize = strFromInstr(it, buffer, bufferSize);
-			assert(checkSize <= bufferSize);
-			fprintf(f, format, addr++, buffer);
-		}
+	for (const auto it : block.getSequence()) {
+		const size_t checkSize = strFromInstr(it, buffer, bufferSize);
+		assert(checkSize <= bufferSize);
+		fprintf(f, format, addr++, buffer);
 	}
-	else
-		fprintf(f, "invalid basic block\n");
 }
 
 int main(int, char **)
 {
+	fprintf(stdout, "sizeof(Instr): %lu\nsizeof(BasicBlock): %lu\nsizeof(ControlFlowGraph): %lu\n\n",
+		sizeof(isa::Instr),
+		sizeof(bb::BasicBlock),
+		sizeof(cfg::ControlFlowGraph));
+
 	using namespace bb;
 
 	// get a basic block of all opcodes -- naturally invalid
@@ -92,9 +98,9 @@ int main(int, char **)
 			instr.setOperand(2, 44);
 			block.addInstr(instr);
 		}
-		print(stdout, block); // print pre-validation state
-		block.validate();
-		print(stdout, block); // verify invalidity
+		const bool valid = block.validate();
+		assert(!valid);
+		print(stdout, block);
 		fputc('\n', stdout);
 	}
 
@@ -131,7 +137,8 @@ int main(int, char **)
 			instr.setOperand(0, 42, true);
 			block.addInstr(instr);
 		}
-		block.validate();
+		const bool valid = block.validate();
+		assert(valid);
 		const bool success = graph.addBasicBlock(std::move(block));
 		assert(success);
 	}
@@ -150,7 +157,8 @@ int main(int, char **)
 			instr.setOperand(0, 127, true);
 			block.addInstr(instr);
 		}
-		block.validate();
+		const bool valid = block.validate();
+		assert(valid);
 		const bool success = graph.addBasicBlock(std::move(block));
 		assert(success);
 	}
@@ -162,7 +170,7 @@ int main(int, char **)
 	size_t colorAlt = 0;
 
 	for (const auto it : graph) {
-		print(stdout, it.second, color[colorAlt]);
+		print(stdout, it, color[colorAlt]);
 		colorAlt ^= 1;
 	}
 

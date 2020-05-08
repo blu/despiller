@@ -3,23 +3,32 @@
 
 #include <assert.h>
 #include <utility>
-#include <map>
+#include <set>
 #include "bb.h"
 
 // Control-flow graph -- nodes constitute basic blocks, edges -- branches to a basic-block start addresses
 
 namespace cfg {
 
-class ControlFlowGraph : std::map< bb::Address, bb::BasicBlock > { // TODO: change map for something more appropriate
-	map& basecast() { return *static_cast< map* >(this); }
-	const map& basecast() const { return *static_cast< const map* >(this); }
+struct LessBB {
+	bool operator ()(const bb::BasicBlock& lhs, const bb::BasicBlock& rhs) const {
+		using namespace bb;
+		const Address laddr = lhs.getStartAddress();
+		const Address raddr = rhs.getStartAddress();
+		return laddr < raddr;
+	}
+};
+
+class ControlFlowGraph : std::set< bb::BasicBlock, LessBB > {
+	set& basecast() { return *static_cast< set* >(this); }
+	const set& basecast() const { return *static_cast< const set* >(this); }
 
 public:
 	bool addBasicBlock(bb::BasicBlock&&);
 	bb::BasicBlock* getBasicBlock(const bb::Address);
 	const bb::BasicBlock* getBasicBlock(const bb::Address) const;
 
-	using map::const_iterator;
+	using set::const_iterator;
 	const_iterator begin() const;
 	const_iterator end() const;
 };
@@ -28,7 +37,6 @@ inline bool ControlFlowGraph::addBasicBlock(bb::BasicBlock&& bb)
 {
 	using namespace bb;
 	const Address bbAddress = bb.getStartAddress();
-	assert(isAddressValid(bbAddress));
 
 	struct Interval {
 		Address begin;
@@ -40,12 +48,12 @@ inline bool ControlFlowGraph::addBasicBlock(bb::BasicBlock&& bb)
 	};
 
 	const Interval incoming = { .begin = bbAddress, .end = bbAddress + Address(bb.getSequence().size()) };
-	const std::pair< const_iterator, const_iterator > range = equal_range(bbAddress);
+	const std::pair< const_iterator, const_iterator > range = equal_range(bb);
 
 	// check preceding elemets for address overlaps
 	for (const_reverse_iterator it = std::make_reverse_iterator<const_iterator>(range.first); it != rend(); ++it) {
-		const Address presentAddr = it->second.getStartAddress();
-		const Interval present = { .begin = presentAddr, .end = presentAddr + Address(it->second.getSequence().size()) };
+		const Address presentAddr = it->getStartAddress();
+		const Interval present = { .begin = presentAddr, .end = presentAddr + Address(it->getSequence().size()) };
 
 		if (incoming.begin >= present.end)
 			break;
@@ -56,8 +64,8 @@ inline bool ControlFlowGraph::addBasicBlock(bb::BasicBlock&& bb)
 
 	// check succeeding elements for address overlaps
 	for (const_iterator it = range.second; it != end(); ++it) {
-		const Address presentAddr = it->second.getStartAddress();
-		const Interval present = { .begin = presentAddr, .end = presentAddr + Address(it->second.getSequence().size()) };
+		const Address presentAddr = it->getStartAddress();
+		const Interval present = { .begin = presentAddr, .end = presentAddr + Address(it->getSequence().size()) };
 
 		if (present.begin >= incoming.end)
 			break;
@@ -66,20 +74,20 @@ inline bool ControlFlowGraph::addBasicBlock(bb::BasicBlock&& bb)
 			return false;
 	}
 
-	insert(value_type(bb.getStartAddress(), std::move(bb)));
+	insert(std::move(bb));
 	return true;
 }
 
 inline bb::BasicBlock* ControlFlowGraph::getBasicBlock(const bb::Address start)
 {
-	const iterator it = find(start);
-	return it != basecast().end() ? &it->second : nullptr;
+	const iterator it = find(bb::BasicBlock(start));
+	return it != basecast().end() ? const_cast< bb::BasicBlock* >(&*it) : nullptr;
 }
 
 inline const bb::BasicBlock* ControlFlowGraph::getBasicBlock(const bb::Address start) const
 {
-	const const_iterator it = find(start);
-	return it != basecast().end() ? &it->second : nullptr;
+	const const_iterator it = find(bb::BasicBlock(start));
+	return it != basecast().end() ? &*it : nullptr;
 }
 
 inline ControlFlowGraph::const_iterator ControlFlowGraph::begin() const

@@ -39,6 +39,12 @@ inline bool isOpcodeValid(const uint8_t op)
 	return op < op__count;
 }
 
+// check opcode for branching
+inline bool isBranch(const Opcode op)
+{
+	return op == op_br || op == op_cbr;
+}
+
 class Instr {
 	constexpr static size_t MAX_OPERAND_COUNT = 3; // non-negotiable symbolic constant
 	Opcode op; // instruction opcode
