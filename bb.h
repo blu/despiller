@@ -54,8 +54,9 @@ public:
 	void addInstr(const isa::Instr&);
 	// replace existing instruction in the basic block
 	void replaceInstr(const size_t index, const isa::Instr newInstr);
-	// check the validity of the basic block
+	// try to validate the basic block
 	bool validate();
+	// check the validity of the basic block
 	bool isValid() const { return flag_valid; }
 };
 

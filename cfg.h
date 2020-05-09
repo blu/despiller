@@ -24,12 +24,17 @@ class ControlFlowGraph : std::set< bb::BasicBlock, LessBB > {
 	const set& basecast() const { return *static_cast< const set* >(this); }
 
 public:
+	// add basic block to the CFG
 	bool addBasicBlock(bb::BasicBlock&&);
+	// look up basic block in the CFG, mutable version
 	bb::BasicBlock* getBasicBlock(const bb::Address);
+	// look up basic block in the CFG, immutable version
 	const bb::BasicBlock* getBasicBlock(const bb::Address) const;
 
 	using set::const_iterator;
+	// get immutable start iterator of the CFG (lowest start address)
 	const_iterator begin() const;
+	// get immutable end iterator of the CFG (one past the final element)
 	const_iterator end() const;
 };
 
