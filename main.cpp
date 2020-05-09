@@ -25,8 +25,8 @@ void print(FILE* f, const bb::BasicBlock& block, const AddressColor addrcolor = 
 
 	const char* format_color[] = { // all entries must contain an %x followed by an %s
 		"\033[38;5;13m%08x\033[0m\t%s\n",
-		"\033[38;5;8m%08x\033[0m\t%s\n",
-		"\033[38;5;15m%08x\033[0m\t%s\n"
+		"\033[0;34;40m%08x\033[0m\t%s\n",
+		"\033[0;35;40m%08x\033[0m\t%s\n"
 	};
 	const char* const format = format_color[uint8_t(addrcolor)];
 	Address addr = block.getStartAddress();
@@ -49,8 +49,8 @@ int main(int, char **)
 
 	// get a basic block of all opcodes -- naturally invalid
 	{
-		using namespace isa;
 		BasicBlock block(0x7f00); // for immediates' sake, keep addresses in 16-bit range
+		using namespace isa;
 		{
 			Instr instr(op_nop);
 			instr.setOperand(0, reg_invalid, true);
@@ -101,14 +101,12 @@ int main(int, char **)
 		const bool valid = block.validate();
 		assert(!valid);
 		print(stdout, block);
-		fputc('\n', stdout);
 	}
 
 	using namespace cfg;
-
 	ControlFlowGraph graph; // full-program CFG
 
-	// compose 'main' of two basic blocks..
+	// compose 'int main()' of two basic blocks..
 	// first basic block -- invoke a callee in our turn
 	{
 		BasicBlock block(0x7000);
@@ -119,7 +117,7 @@ int main(int, char **)
 			block.addInstr(instr);
 		}
 		{
-			Instr instr(op_li); // load branch target
+			Instr instr(op_li); // load branch target -- foo
 			instr.setOperand(0, 42);
 			instr.setOperand(1, 0x00);
 			instr.setOperand(2, 0x7f);
@@ -142,7 +140,6 @@ int main(int, char **)
 		const bool success = graph.addBasicBlock(std::move(block));
 		assert(success);
 	}
-
 	// second basic block -- once our callee is done we return to our caller
 	{
 		BasicBlock block(0x7004);
@@ -153,7 +150,7 @@ int main(int, char **)
 			block.addInstr(instr);
 		}
 		{
-			Instr instr(op_br); // branch to caller, i.e. return
+			Instr instr(op_br); // branch to caller -- return
 			instr.setOperand(0, 127, true);
 			block.addInstr(instr);
 		}
@@ -162,14 +159,54 @@ int main(int, char **)
 		const bool success = graph.addBasicBlock(std::move(block));
 		assert(success);
 	}
-
+	// compose 'int foo()' of one basic block
+	{
+		BasicBlock block(0x7f00);
+		using namespace isa;
+		{
+			Instr instr(op_push); // push link to caller
+			instr.setOperand(0, 127, true);
+			block.addInstr(instr);
+		}
+		{
+			union {
+				const int16_t imm = -42;
+				uint8_t imm_arr[2];
+			};
+			Instr instr(op_li); // load result from foo
+			instr.setOperand(0, 0);
+			instr.setOperand(1, imm_arr[0]);
+			instr.setOperand(2, imm_arr[1]);
+			block.addInstr(instr);
+		}
+		{
+			Instr instr(op_pop); // pop link to caller
+			instr.setOperand(0, 127, true);
+			block.addInstr(instr);
+		}
+		{
+			Instr instr(op_br); // branch to caller -- return
+			instr.setOperand(0, 127, true);
+			block.addInstr(instr);
+		}
+		const bool valid = block.validate();
+		assert(valid);
+		const bool success = graph.addBasicBlock(std::move(block));
+		assert(success);
+	}
 	const AddressColor color[] = {
 		addrcolor_one,
 		addrcolor_two
 	};
 	size_t colorAlt = 0;
 
+	Address lastEnd = addr_invalid;
 	for (const auto it : graph) {
+		// print a gap at each address discontinuity
+		const Address bbStart = it.getStartAddress();
+		if (bbStart != lastEnd)
+			fputc('\n', stdout);
+		lastEnd = bbStart + Address(it.getSequence().size());
 		print(stdout, it, color[colorAlt]);
 		colorAlt ^= 1;
 	}
