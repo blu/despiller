@@ -5,6 +5,7 @@
 #include <utility>
 #include <set>
 #include "bb.h"
+#include "reg.h"
 
 // Control-flow graph -- nodes constitute basic blocks, edges -- branches to a basic-block start addresses
 
