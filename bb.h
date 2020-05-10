@@ -16,6 +16,9 @@ typedef uint32_t Address;
 // sequence of instructions
 typedef std::vector< isa::Instr > Instructions;
 
+// branch-target buffer
+typedef std::vector< Address > BTB;
+
 constexpr Address addr_invalid = Address(-1);
 constexpr Address addr_topbit = Address(-1) << sizeof(Address) * 8 - 1;
 
@@ -36,12 +39,12 @@ inline Address revalidateAddress(const Address addr)
 
 class BasicBlock {
 	const Address start; // basic-block start address
-	Address exit[2]; // two potential branch targets for exit from the basic block (two when the BB ends with a conditional branch)
-	Address flag_valid : 1;
+	Address flag_valid : 1; // basic-block validity
+	BTB exit; // branch targets for exit from the basic block
 	Instructions instr; // basic-block instructions
 
 public:
-	explicit BasicBlock(const Address start) : start(start), exit{ addr_invalid, addr_invalid }, flag_valid(false) { assert(isAddressValid(start)); }
+	explicit BasicBlock(const Address start) : start(start), flag_valid(false) { assert(isAddressValid(start)); }
 	BasicBlock(const BasicBlock&) = default;
 	BasicBlock(BasicBlock&&) = default;
 	// get start address of the basic block
@@ -67,8 +70,7 @@ inline Address BasicBlock::getStartAddress() const
 
 inline Address BasicBlock::getExitTargetAddress(const size_t index) const
 {
-	assert(index < sizeof(exit) / sizeof(exit[0]));
-	return exit[index];
+	return index < exit.size() ? exit[index] : addr_invalid;
 }
 
 inline const Instructions& BasicBlock::getSequence() const
@@ -112,8 +114,9 @@ inline bool BasicBlock::validate()
 	// unless ending with an unconditional branch, one of the branch
 	// targets out of this BB is the first address immediately after
 	// this BB; any other targets will be resolved at linking
-	exit[0] = op_br != instr.back().getOpcode() ? start + instr.size() : addr_invalid;
-	exit[1] = addr_invalid;
+	exit.clear();
+	if (op_br != instr.back().getOpcode())
+		exit.push_back(start + Address(instr.size()));
 
 	flag_valid = true;
 	return true;
