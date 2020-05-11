@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <assert.h>
 #include <map>
-#include <set>
 #include "isa.h"
 
 // GPR file occupancy map -- stores constants and unknowns, per register
@@ -12,16 +11,14 @@
 namespace reg {
 
 typedef isa::Operand Register;
-typedef int32_t Value;
+typedef isa::Word Value;
 
 class Registry {
 public:
 	typedef std::multimap< Register, Value > Values;
-	typedef std::set< Register > Unknowns;
 
 private:
 	Values values;
-	Unknowns unknowns;
 
 public:
 	// add unknown to the given register; at most one unknown tracked per register
@@ -40,11 +37,6 @@ public:
 	void merge(const Registry&);
 };
 
-inline void Registry::addUnknown(const Register reg)
-{
-	unknowns.insert(reg);
-}
-
 inline void Registry::addValue(const Register reg, const Value val)
 {
 	// check if this reg-val pair is already present
@@ -57,14 +49,16 @@ inline void Registry::addValue(const Register reg, const Value val)
 	values.insert(Values::value_type(reg, val));
 }
 
+inline void Registry::addUnknown(const Register reg)
+{
+	addValue(reg, isa::word_invalid);
+}
+
 inline void Registry::vacate(const Register reg)
 {
 	// erase any values
 	const std::pair< Values::const_iterator, Values::const_iterator > range = values.equal_range(reg);
 	values.erase(range.first, range.second);
-
-	// erase possible unknown
-	unknowns.erase(reg);
 }
 
 inline std::pair< Registry::Values::const_iterator, Registry::Values::const_iterator > Registry::getValues(const Register reg) const
@@ -75,7 +69,7 @@ inline std::pair< Registry::Values::const_iterator, Registry::Values::const_iter
 
 inline bool Registry::occupied(const Register reg) const
 {
-	return unknowns.find(reg) != unknowns.end() || values.find(reg) != values.end();
+	return values.find(reg) != values.end();
 }
 
 } // namespace reg

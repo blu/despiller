@@ -40,10 +40,11 @@ void print(FILE* f, const bb::BasicBlock& block, const AddressColor addrcolor = 
 
 int main(int, char **)
 {
-	fprintf(stdout, "sizeof(Instr): %lu\nsizeof(BasicBlock): %lu\nsizeof(ControlFlowGraph): %lu\n\n",
+	fprintf(stdout, "sizeof(Instr): %lu\nsizeof(BasicBlock): %lu\nsizeof(ControlFlowGraph): %lu\nsizeof(Registry): %lu\n\n",
 		sizeof(isa::Instr),
 		sizeof(bb::BasicBlock),
-		sizeof(cfg::ControlFlowGraph));
+		sizeof(cfg::ControlFlowGraph),
+		sizeof(reg::Registry));
 
 	using namespace bb;
 

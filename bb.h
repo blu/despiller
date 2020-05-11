@@ -11,7 +11,24 @@
 namespace bb {
 
 // address in a Von-Neumann machine -- word granularity
-typedef uint32_t Address;
+typedef isa::Word Address;
+
+constexpr Address addr_invalid = isa::word_invalid;
+
+inline bool isAddrValid(Address addr)
+{
+	return isa::isWordValid(addr);
+}
+
+inline Address invalidateAddr(const Address addr)
+{
+	return Address{addr.word, 1};
+}
+
+inline Address revalidateAddr(const Address addr)
+{
+	return Address{addr.word, 0};
+}
 
 // sequence of instructions
 typedef std::vector< isa::Instr > Instructions;
@@ -19,32 +36,13 @@ typedef std::vector< isa::Instr > Instructions;
 // branch-target buffer
 typedef std::vector< Address > BTB;
 
-constexpr Address addr_invalid = Address(-1);
-constexpr Address addr_topbit = Address(-1) << sizeof(Address) * 8 - 1;
-
-inline bool isAddressValid(Address addr)
-{
-	return 0 == (addr & addr_topbit);
-}
-
-inline Address invalidateAddress(const Address addr)
-{
-	return addr | addr_topbit;
-}
-
-inline Address revalidateAddress(const Address addr)
-{
-	return addr & ~addr_topbit;
-}
-
 class BasicBlock {
-	const Address start; // basic-block start address
-	Address flag_valid : 1; // basic-block validity
+	Address start; // basic-block start address
 	BTB exit; // branch targets for exit from the basic block
 	Instructions instr; // basic-block instructions
 
 public:
-	explicit BasicBlock(const Address start) : start(start), flag_valid(false) { assert(isAddressValid(start)); }
+	explicit BasicBlock(const Address aStart) : start(invalidateAddr(aStart)) { assert(isAddrValid(aStart)); }
 	BasicBlock(const BasicBlock&) = default;
 	BasicBlock(BasicBlock&&) = default;
 	// get start address of the basic block
@@ -60,7 +58,7 @@ public:
 	// try to validate the basic block
 	bool validate();
 	// check the validity of the basic block
-	bool isValid() const { return flag_valid; }
+	bool isValid() const { return isAddrValid(start); }
 };
 
 inline Address BasicBlock::getStartAddress() const
@@ -80,13 +78,13 @@ inline const Instructions& BasicBlock::getSequence() const
 
 inline void BasicBlock::addInstr(const isa::Instr& newInstr)
 {
-	flag_valid = false;
+	start = invalidateAddr(start);
 	instr.push_back(newInstr);
 }
 
 inline void BasicBlock::replaceInstr(const size_t index, const isa::Instr newInstr)
 {
-	flag_valid = false;
+	start = invalidateAddr(start);
 	assert(index < instr.size());
 	instr[index] = newInstr;
 }
@@ -118,7 +116,7 @@ inline bool BasicBlock::validate()
 	if (op_br != instr.back().getOpcode())
 		exit.push_back(start + Address(instr.size()));
 
-	flag_valid = true;
+	start = revalidateAddr(start);
 	return true;
 }
 

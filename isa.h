@@ -30,7 +30,7 @@ enum Opcode : uint8_t {
 // operands -- usually register identifiers
 typedef uint8_t Operand;
 
-constexpr Opcode op_invalid = static_cast< Opcode >(uint8_t(-1));
+constexpr Opcode op_invalid = Opcode(uint8_t(-1));
 constexpr Operand reg_invalid = Operand(-1);
 
 // check opcode validity
@@ -45,11 +45,43 @@ inline bool isBranch(const Opcode op)
 	return op == op_br || op == op_cbr;
 }
 
-class Instr {
+// machine word -- 31-bit, plus a hidden (non-architectural) bit
+struct Word {
+	uint32_t word : 31;
+	uint32_t reserved : 1;
+
+	// construct word from architectural and non-architectural parts
+	constexpr Word(uint32_t word, uint32_t reserved) : word(word), reserved(reserved) {}
+	// construct architectural word from uint32_t -- implicit
+	Word(uint32_t word) : word(word), reserved(0) {}
+	// convert architectural word to uint32_t
+	operator uint32_t () const { return word; }
+
+	// pre-increment architectural word (for address arithmetics)
+	Word& operator ++() { ++word; return *this; }
+	// post-increment architectural word (for address arithmetics)
+	Word operator ++(int) { const Word res = *this; ++word; return res; }
+	// pre-decrement architectural word (for address arithmetics)
+	Word& operator --() { --word; return *this; }
+	// post-decrement architectural word (for address arithmetics)
+	Word operator --(int) { const Word res = *this; --word; return res; }
+};
+
+constexpr Word word_invalid{0, 1};
+constexpr Word word_min_int{(1U << 30), 0}; // two's complement: -(2^30)
+constexpr Word word_max_int{(1U << 30) - 1, 0}; // two's complement: 2^30 - 1
+
+inline bool isWordValid(const Word word)
+{
+	return 0 == word.reserved;
+}
+
+// machine instruction
+class __attribute__ ((aligned(4))) Instr {
 	constexpr static size_t MAX_OPERAND_COUNT = 3; // non-negotiable symbolic constant
-	Opcode op; // instruction opcode
 	Operand r[MAX_OPERAND_COUNT]; // instruction operands, 1st through last (reg-invalid for operands past the last)
 	// For opcode 'li', r[0] contains the destination, whereas r[1..2] contain a little-endian immediate value
+	Opcode op; // instruction opcode; most-significant bit reserved
 
 public:
 	explicit Instr(const Opcode op) : op(op) {}
@@ -60,7 +92,7 @@ public:
 	// set instruction operand at specified index; optionally invalidate the remaining operands
 	void setOperand(const size_t index, const Operand reg, const bool invalidateRest = false);
 	// get instruction immediate operand
-	int32_t getImm() const;
+	uint32_t getImm() const;
 };
 
 inline Opcode Instr::getOpcode() const
@@ -116,10 +148,10 @@ inline void Instr::setOperand(const size_t index, const Operand reg, const bool 
 	}
 }
 
-inline int32_t Instr::getImm() const
+inline uint32_t Instr::getImm() const
 {
 	assert(op_li == op);
-	return int16_t(uint16_t(r[1]) + (uint16_t(r[2]) << 8));
+	return Word(int16_t(uint16_t(r[1]) + (uint16_t(r[2]) << 8)), 0);
 }
 
 inline const char* strFromOpcode(const Opcode op)
