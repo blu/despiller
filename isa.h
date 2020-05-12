@@ -8,7 +8,7 @@
 
 // Fake ISA whose sole purpose is to demonstrate the effect of de-spilling
 
-// This ISA has an unspecified-size GPR file R0..Rn, and an unlimited storage space 'storage'
+// This ISA of little-endian 31-bit machine word has an unspecified-size GPR file R0..Rn, and an unlimited storage space 'storage'
 // where regs can be spilled -- i.e. stored to and eventually restored from, in a LIFO manner
 
 namespace isa {
@@ -80,7 +80,7 @@ inline bool isWordValid(const Word word)
 class __attribute__ ((aligned(4))) Instr {
 	constexpr static size_t MAX_OPERAND_COUNT = 3; // non-negotiable symbolic constant
 	Operand r[MAX_OPERAND_COUNT]; // instruction operands, 1st through last (reg-invalid for operands past the last)
-	// For opcode 'li', r[0] contains the destination, whereas r[1..2] contain a little-endian immediate value
+	                              // For opcode 'li' r[1..2] contain a little-endian immediate value
 	Opcode op; // instruction opcode; most-significant bit reserved
 
 public:
