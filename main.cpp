@@ -38,6 +38,34 @@ void print(FILE* f, const bb::BasicBlock& block, const AddressColor addrcolor = 
 	}
 }
 
+void print(FILE* f, const reg::Registry& registry, const bb::Address address)
+{
+	fprintf(f, "\033[38;5;13m%08x\033[0m\n", address);
+
+	if (registry.begin() == registry.end()) {
+		fprintf(f, "empty\n");
+		return;
+	}
+
+	using namespace reg;
+	using namespace isa;
+	Register last = reg_invalid;
+
+	for (const auto it : registry) {
+		if (last != it.first) {
+			fprintf(f, reg_invalid == last ? "%04x { " : "}\n%04x { ", it.first);
+			last = it.first;
+		}
+		if (word_invalid != it.second) {
+			fprintf(f, "0x%08x ", it.second);
+		}
+		else {
+			fprintf(f, "unknown ");
+		}
+	}
+	fprintf(f, "}\n");
+}
+
 int main(int, char **)
 {
 	fprintf(stdout, "sizeof(Instr): %lu\nsizeof(BasicBlock): %lu\nsizeof(ControlFlowGraph): %lu\nsizeof(Registry): %lu\n\n",
@@ -104,15 +132,14 @@ int main(int, char **)
 		print(stdout, block);
 	}
 
-	using namespace reg;
 	using namespace cfg;
 	ControlFlowGraph graph; // full-program CFG
 
 	// compose 'int main()' of two basic blocks..
-	const Address addrMain = 0x7000;
+	const Address addrMain_0 = 0x7000;
 	// first basic block -- invoke a callee in our turn
 	{
-		BasicBlock block(addrMain);
+		BasicBlock block(addrMain_0);
 		using namespace isa;
 		{
 			Instr instr(op_push); // push link to caller
@@ -143,9 +170,10 @@ int main(int, char **)
 		const bool success = graph.addBasicBlock(std::move(block));
 		assert(success);
 	}
+	const Address addrMain_1 = 0x7004;
 	// second basic block -- once our callee is done we return to our caller
 	{
-		BasicBlock block(0x7004);
+		BasicBlock block(addrMain_1);
 		using namespace isa;
 		{
 			Instr instr(op_pop); // pop link to caller
@@ -160,13 +188,6 @@ int main(int, char **)
 		const bool valid = block.validate();
 		assert(valid);
 		const bool success = graph.addBasicBlock(std::move(block));
-		assert(success);
-	}
-	// set up at-entry registry for 'int main()'
-	{
-		Registry reg;
-		reg.addUnknown(127); // LR
-		const bool success = graph.setRegistry(addrMain, std::move(reg));
 		assert(success);
 	}
 
@@ -206,14 +227,8 @@ int main(int, char **)
 		const bool success = graph.addBasicBlock(std::move(block));
 		assert(success);
 	}
-	// set up at-entry registry for 'int foo()'
-	{
-		Registry reg;
-		reg.addUnknown(127); // LR
-		const bool success = graph.setRegistry(addrFoo, std::move(reg));
-		assert(success);
-	}
 
+	// print out the BBs
 	const AddressColor color[] = {
 		addrcolor_one,
 		addrcolor_two
@@ -231,6 +246,46 @@ int main(int, char **)
 		print(stdout, it, color[colorAlt]);
 		colorAlt ^= 1;
 	}
+
+	// perform CFG analysis (BBs and their order are preset as no automated CFG traversal yet)
+	using namespace reg;
+
+	graph.stackClear();
+	// set up at-entry registry for 'int main()' and compute at-exit registry
+	{
+		Registry reg;
+		reg.addUnknown(127); // our main takes just an LR as an arg
+		bool success = graph.setRegistry(addrMain_0, std::move(reg));
+		assert(success);
+		success = graph.calcRegistry(addrMain_0);
+		assert(success);
+	}
+	// set up at-entry registry for 'int foo()' and compute at-exit registry
+	{
+		Registry reg(*graph.getRegistry(addrMain_0, REG_EXIT));
+		bool success = graph.setRegistry(addrFoo, std::move(reg));
+		assert(success);
+		success = graph.calcRegistry(addrFoo);
+		assert(success);
+	}
+	// set up at-entry registry for 'int main():past-callee' and compute at-exit registry
+	{
+		Registry reg(*graph.getRegistry(addrFoo, REG_EXIT));
+		bool success = graph.setRegistry(addrMain_1, std::move(reg));
+		assert(success);
+		success = graph.calcRegistry(addrMain_1);
+		assert(success);
+	}
+
+	putc('\n', stdout);
+	print(stdout, *graph.getRegistry(addrMain_0, REG_ENTRY), addrMain_0);
+	print(stdout, *graph.getRegistry(addrMain_0, REG_EXIT), addrMain_0 + graph.getBasicBlock(addrMain_0)->getSequence().size() - 1);
+
+	print(stdout, *graph.getRegistry(addrFoo, REG_ENTRY), addrFoo);
+	print(stdout, *graph.getRegistry(addrFoo, REG_EXIT), addrFoo + graph.getBasicBlock(addrFoo)->getSequence().size() - 1);
+
+	print(stdout, *graph.getRegistry(addrMain_1, REG_ENTRY), addrMain_1);
+	print(stdout, *graph.getRegistry(addrMain_1, REG_EXIT), addrMain_1 + graph.getBasicBlock(addrMain_1)->getSequence().size() - 1);
 
 	return 0;
 }

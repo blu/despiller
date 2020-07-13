@@ -77,10 +77,11 @@ inline bool isWordValid(const Word word)
 }
 
 // machine instruction
+// Up to 3 operands r0..r2, in dense order; 1-operand instructions use r0; 2-operand instructions use r0..r1; when present, dst operand is r0.
+// For opcode 'li' r1..r2 contain a little-endian immediate value, i.e. r1: LSB, r2: MSB. Unused operands contain reg-invalid.
 class __attribute__ ((aligned(4))) Instr {
 	constexpr static size_t MAX_OPERAND_COUNT = 3; // non-negotiable symbolic constant
 	Operand r[MAX_OPERAND_COUNT]; // instruction operands, 1st through last (reg-invalid for operands past the last)
-	                              // For opcode 'li' r[1..2] contain a little-endian immediate value
 	Opcode op; // instruction opcode; most-significant bit reserved
 
 public:

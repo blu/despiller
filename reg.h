@@ -12,12 +12,26 @@ namespace reg {
 
 typedef isa::Operand Register;
 typedef isa::Word Value;
+typedef std::multimap< Register, Value > Values;
+
+// next type needs to be a derivation and not a mere typedef -- latter breaks ranged-for
+struct ValueRange : std::pair< Values::const_iterator, Values::const_iterator >
+{
+	ValueRange(const std::pair< Values::const_iterator, Values::const_iterator >& src) : pair(src) {}
+	ValueRange(std::pair< Values::const_iterator, Values::const_iterator >&& src) : pair(std::move(src)) {}
+};
+
+inline Values::const_iterator begin(const ValueRange& range)
+{
+	return range.first;
+}
+
+inline Values::const_iterator end(const ValueRange& range)
+{
+	return range.second;
+}
 
 class Registry {
-public:
-	typedef std::multimap< Register, Value > Values;
-
-private:
 	Values values;
 
 public:
@@ -29,12 +43,17 @@ public:
 	void vacate(const Register);
 
 	// get all known values for the given register
-	std::pair< Values::const_iterator, Values::const_iterator > getValues(const Register) const;
+	ValueRange getValues(const Register) const;
 	// get occupancy of the given register, whether by values or unknowns
 	bool occupied(const Register) const;
 
 	// add the content of another registry to this one
 	void merge(const Registry&);
+
+	// get immutable start iterator of the registry (first element)
+	Values::const_iterator begin() const;
+	// get immutable end iterator of the registry (one past the final element)
+	Values::const_iterator end() const;
 };
 
 inline void Registry::addValue(const Register reg, const Value val)
@@ -61,7 +80,7 @@ inline void Registry::vacate(const Register reg)
 	values.erase(range.first, range.second);
 }
 
-inline std::pair< Registry::Values::const_iterator, Registry::Values::const_iterator > Registry::getValues(const Register reg) const
+inline ValueRange Registry::getValues(const Register reg) const
 {
 	const std::pair< Values::const_iterator, Values::const_iterator > range = values.equal_range(reg);
 	return range;
@@ -74,9 +93,18 @@ inline bool Registry::occupied(const Register reg) const
 
 inline void Registry::merge(const Registry& oth)
 {
-	for (auto it : oth.values) {
+	for (auto it : oth.values)
 		addValue(it.first, it.second);
-	}
+}
+
+inline Values::const_iterator Registry::begin() const
+{
+	return values.begin();
+}
+
+inline Values::const_iterator Registry::end() const
+{
+	return values.end();
 }
 
 } // namespace reg
