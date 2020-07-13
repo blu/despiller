@@ -165,8 +165,8 @@ int main(int, char **)
 	// set up at-entry registry for 'int main()'
 	{
 		Registry reg;
-		reg.addUnknown(0x7f); // LR
-		const bool success = graph.addRegistry(addrMain, std::move(reg));
+		reg.addUnknown(127); // LR
+		const bool success = graph.setRegistry(addrMain, std::move(reg));
 		assert(success);
 	}
 
@@ -209,8 +209,8 @@ int main(int, char **)
 	// set up at-entry registry for 'int foo()'
 	{
 		Registry reg;
-		reg.addUnknown(0x7f); // LR
-		const bool success = graph.addRegistry(addrFoo, std::move(reg));
+		reg.addUnknown(127); // LR
+		const bool success = graph.setRegistry(addrFoo, std::move(reg));
 		assert(success);
 	}
 

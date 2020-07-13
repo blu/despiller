@@ -45,8 +45,8 @@ public:
 		REG_EXIT // registry at exit
 	};
 
-	// add registry at BB entry to the CFG; mandates a pre-existing BB
-	bool addRegistry(const bb::Address, reg::Registry&&);
+	// set registry at BB entry in the CFG; mandates a pre-existing BB
+	bool setRegistry(const bb::Address, reg::Registry&&);
 	// look up registry in the CFG, mutable version
 	reg::Registry* getRegistry(const bb::Address, const RegOrder);
 	// look up registry in the CFG, immutable version
@@ -118,7 +118,7 @@ inline const bb::BasicBlock* ControlFlowGraph::getBasicBlock(const bb::Address s
 	return it != bblocks.end() ? &*it : nullptr;
 }
 
-inline bool ControlFlowGraph::addRegistry(const bb::Address bbAddress, reg::Registry&& src)
+inline bool ControlFlowGraph::setRegistry(const bb::Address bbAddress, reg::Registry&& src)
 {
 	BBAndReg* const p = static_cast< BBAndReg* >(getBasicBlock(bbAddress));
 
