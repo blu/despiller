@@ -20,9 +20,14 @@ struct LessBB {
 	}
 };
 
-class ControlFlowGraph : std::set< bb::BasicBlock, LessBB > {
-	set& basecast() { return *static_cast< set* >(this); }
-	const set& basecast() const { return *static_cast< const set* >(this); }
+typedef std::pair< reg::Registry, reg::Registry > RegistryPair;
+
+class ControlFlowGraph {
+	typedef std::set< bb::BasicBlock, LessBB > BBlocks;
+	typedef std::map< bb::Address, RegistryPair > Registries;
+
+	BBlocks bblocks; // basic-block nodes in the CFG
+	Registries registries; // a pair of registries for each BB: first -- entry, second -- exit
 
 public:
 	// add basic block to the CFG
@@ -31,8 +36,13 @@ public:
 	bb::BasicBlock* getBasicBlock(const bb::Address);
 	// look up basic block in the CFG, immutable version
 	const bb::BasicBlock* getBasicBlock(const bb::Address) const;
+	// look up registry pair in the CFG, mutable version
+	RegistryPair* getRegistry(const bb::Address);
+	// look up registry pair in the CFG, immutable version
+	const RegistryPair* getRegistry(const bb::Address) const;
 
-	using set::const_iterator;
+
+	typedef BBlocks::const_iterator const_iterator;
 	// get immutable start iterator of the CFG (lowest start address)
 	const_iterator begin() const;
 	// get immutable end iterator of the CFG (one past the final element)
@@ -54,10 +64,10 @@ inline bool ControlFlowGraph::addBasicBlock(bb::BasicBlock&& bb)
 	};
 
 	const Interval incoming = { .begin = bbAddress, .end = bbAddress + Address(bb.getSequence().size()) };
-	const std::pair< const_iterator, const_iterator > range = equal_range(bb);
+	const std::pair< const_iterator, const_iterator > range = bblocks.equal_range(bb);
 
 	// check preceding elemets for address overlaps
-	for (const_reverse_iterator it = std::make_reverse_iterator<const_iterator>(range.first); it != rend(); ++it) {
+	for (BBlocks::const_reverse_iterator it = std::make_reverse_iterator<const_iterator>(range.first); it != bblocks.rend(); ++it) {
 		const Address presentAddr = it->getStartAddress();
 		const Interval present = { .begin = presentAddr, .end = presentAddr + Address(it->getSequence().size()) };
 
@@ -69,7 +79,7 @@ inline bool ControlFlowGraph::addBasicBlock(bb::BasicBlock&& bb)
 	}
 
 	// check succeeding elements for address overlaps
-	for (const_iterator it = range.second; it != end(); ++it) {
+	for (BBlocks::const_iterator it = range.second; it != bblocks.end(); ++it) {
 		const Address presentAddr = it->getStartAddress();
 		const Interval present = { .begin = presentAddr, .end = presentAddr + Address(it->getSequence().size()) };
 
@@ -80,30 +90,44 @@ inline bool ControlFlowGraph::addBasicBlock(bb::BasicBlock&& bb)
 			return false;
 	}
 
-	insert(std::move(bb));
+	bblocks.insert(std::move(bb));
 	return true;
 }
 
 inline bb::BasicBlock* ControlFlowGraph::getBasicBlock(const bb::Address start)
 {
-	const iterator it = find(bb::BasicBlock(start));
-	return it != basecast().end() ? const_cast< bb::BasicBlock* >(&*it) : nullptr;
+	// following const_cast may look like trouble but the so-obtained BB actually
+	// cannot be mutated to a dregree where it could violate the container order
+	const BBlocks::iterator it = bblocks.find(bb::BasicBlock(start));
+	return it != bblocks.end() ? const_cast< bb::BasicBlock* >(&*it) : nullptr;
 }
 
 inline const bb::BasicBlock* ControlFlowGraph::getBasicBlock(const bb::Address start) const
 {
-	const const_iterator it = find(bb::BasicBlock(start));
-	return it != basecast().end() ? &*it : nullptr;
+	const BBlocks::const_iterator it = bblocks.find(bb::BasicBlock(start));
+	return it != bblocks.end() ? &*it : nullptr;
+}
+
+inline RegistryPair* ControlFlowGraph::getRegistry(const bb::Address start)
+{
+	const Registries::iterator it = registries.find(start);
+	return it != registries.end() ? &it->second : nullptr;
+}
+
+inline const RegistryPair* ControlFlowGraph::getRegistry(const bb::Address start) const
+{
+	const Registries::const_iterator it = registries.find(start);
+	return it != registries.end() ? &it->second : nullptr;
 }
 
 inline ControlFlowGraph::const_iterator ControlFlowGraph::begin() const
 {
-	return basecast().begin();
+	return bblocks.begin();
 }
 
 inline ControlFlowGraph::const_iterator ControlFlowGraph::end() const
 {
-	return basecast().end();
+	return bblocks.end();
 }
 
 } // namespace cfg

@@ -41,6 +41,8 @@ class BasicBlock {
 	BTB exit; // branch targets for exit from the basic block
 	Instructions instr; // basic-block instructions
 
+	BasicBlock& operator =(const BasicBlock&) = delete;
+
 public:
 	explicit BasicBlock(const Address aStart) : start(invalidateAddr(aStart)) { assert(isAddrValid(aStart)); }
 	BasicBlock(const BasicBlock&) = default;

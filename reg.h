@@ -33,7 +33,7 @@ public:
 	// get occupancy of the given register, whether by values or unknowns
 	bool occupied(const Register) const;
 
-	// add the content of another registry to the registry
+	// add the content of another registry to this one
 	void merge(const Registry&);
 };
 
@@ -70,6 +70,13 @@ inline std::pair< Registry::Values::const_iterator, Registry::Values::const_iter
 inline bool Registry::occupied(const Register reg) const
 {
 	return values.find(reg) != values.end();
+}
+
+inline void Registry::merge(const Registry& oth)
+{
+	for (auto it : oth.values) {
+		addValue(it.first, it.second);
+	}
 }
 
 } // namespace reg
