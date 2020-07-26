@@ -104,13 +104,15 @@ int main(int, char **)
 		print(stdout, block);
 	}
 
+	using namespace reg;
 	using namespace cfg;
 	ControlFlowGraph graph; // full-program CFG
 
 	// compose 'int main()' of two basic blocks..
+	const Address addrMain = 0x7000;
 	// first basic block -- invoke a callee in our turn
 	{
-		BasicBlock block(0x7000);
+		BasicBlock block(addrMain);
 		using namespace isa;
 		{
 			Instr instr(op_push); // push link to caller
@@ -160,9 +162,18 @@ int main(int, char **)
 		const bool success = graph.addBasicBlock(std::move(block));
 		assert(success);
 	}
-	// compose 'int foo()' of one basic block
+	// set up at-entry registry for 'int main()'
 	{
-		BasicBlock block(0x7f00);
+		Registry reg;
+		reg.addUnknown(0x7f); // LR
+		const bool success = graph.addRegistry(addrMain, std::move(reg));
+		assert(success);
+	}
+
+	// compose 'int foo()' of one basic block
+	const Address addrFoo = 0x7f00;
+	{
+		BasicBlock block(addrFoo);
 		using namespace isa;
 		{
 			Instr instr(op_push); // push link to caller
@@ -195,10 +206,19 @@ int main(int, char **)
 		const bool success = graph.addBasicBlock(std::move(block));
 		assert(success);
 	}
+	// set up at-entry registry for 'int foo()'
+	{
+		Registry reg;
+		reg.addUnknown(0x7f); // LR
+		const bool success = graph.addRegistry(addrFoo, std::move(reg));
+		assert(success);
+	}
+
 	const AddressColor color[] = {
 		addrcolor_one,
 		addrcolor_two
 	};
+
 	size_t colorAlt = 0;
 
 	Address lastEnd = addr_invalid;

@@ -20,14 +20,17 @@ struct LessBB {
 	}
 };
 
-typedef std::pair< reg::Registry, reg::Registry > RegistryPair;
-
 class ControlFlowGraph {
-	typedef std::set< bb::BasicBlock, LessBB > BBlocks;
-	typedef std::map< bb::Address, RegistryPair > Registries;
+	struct BBAndReg : bb::BasicBlock
+	{
+		BBAndReg(const bb::BasicBlock& src) : bb::BasicBlock(src) {}
+		BBAndReg(bb::BasicBlock&& src) : bb::BasicBlock(std::move(src)) {}
+
+		reg::Registry reg[2]; // entry, exit
+	};
+	typedef std::set< BBAndReg, LessBB > BBlocks;
 
 	BBlocks bblocks; // basic-block nodes in the CFG
-	Registries registries; // a pair of registries for each BB: first -- entry, second -- exit
 
 public:
 	// add basic block to the CFG
@@ -36,11 +39,18 @@ public:
 	bb::BasicBlock* getBasicBlock(const bb::Address);
 	// look up basic block in the CFG, immutable version
 	const bb::BasicBlock* getBasicBlock(const bb::Address) const;
-	// look up registry pair in the CFG, mutable version
-	RegistryPair* getRegistry(const bb::Address);
-	// look up registry pair in the CFG, immutable version
-	const RegistryPair* getRegistry(const bb::Address) const;
 
+	enum RegOrder {
+		REG_ENTRY, // registry at entry
+		REG_EXIT // registry at exit
+	};
+
+	// add registry at BB entry to the CFG; mandates a pre-existing BB
+	bool addRegistry(const bb::Address, reg::Registry&&);
+	// look up registry in the CFG, mutable version
+	reg::Registry* getRegistry(const bb::Address, const RegOrder);
+	// look up registry in the CFG, immutable version
+	const reg::Registry* getRegistry(const bb::Address, const RegOrder) const;
 
 	typedef BBlocks::const_iterator const_iterator;
 	// get immutable start iterator of the CFG (lowest start address)
@@ -99,7 +109,7 @@ inline bb::BasicBlock* ControlFlowGraph::getBasicBlock(const bb::Address start)
 	// following const_cast may look like trouble but the so-obtained BB actually
 	// cannot be mutated to a dregree where it could violate the container order
 	const BBlocks::iterator it = bblocks.find(bb::BasicBlock(start));
-	return it != bblocks.end() ? const_cast< bb::BasicBlock* >(&*it) : nullptr;
+	return it != bblocks.end() ? const_cast< BBAndReg* >(&*it) : nullptr;
 }
 
 inline const bb::BasicBlock* ControlFlowGraph::getBasicBlock(const bb::Address start) const
@@ -108,16 +118,29 @@ inline const bb::BasicBlock* ControlFlowGraph::getBasicBlock(const bb::Address s
 	return it != bblocks.end() ? &*it : nullptr;
 }
 
-inline RegistryPair* ControlFlowGraph::getRegistry(const bb::Address start)
+inline bool ControlFlowGraph::addRegistry(const bb::Address bbAddress, reg::Registry&& src)
 {
-	const Registries::iterator it = registries.find(start);
-	return it != registries.end() ? &it->second : nullptr;
+	BBAndReg* const p = static_cast< BBAndReg* >(getBasicBlock(bbAddress));
+
+	if (!p)
+		return false;
+
+	new (&p->reg[REG_ENTRY]) reg::Registry(std::move(src));
+	return true;
 }
 
-inline const RegistryPair* ControlFlowGraph::getRegistry(const bb::Address start) const
+inline reg::Registry* ControlFlowGraph::getRegistry(const bb::Address start, const ControlFlowGraph::RegOrder order)
 {
-	const Registries::const_iterator it = registries.find(start);
-	return it != registries.end() ? &it->second : nullptr;
+	// following const_cast may look like trouble but the so-obtained BB actually
+	// cannot be mutated to a dregree where it could violate the container order
+	const BBlocks::iterator it = bblocks.find(bb::BasicBlock(start));
+	return it != bblocks.end() ? const_cast< reg::Registry* >(&it->reg[order]) : nullptr;
+}
+
+inline const reg::Registry* ControlFlowGraph::getRegistry(const bb::Address start, const ControlFlowGraph::RegOrder order) const
+{
+	const BBlocks::const_iterator it = bblocks.find(bb::BasicBlock(start));
+	return it != bblocks.end() ? &it->reg[order] : nullptr;
 }
 
 inline ControlFlowGraph::const_iterator ControlFlowGraph::begin() const
