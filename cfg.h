@@ -125,7 +125,7 @@ inline bool ControlFlowGraph::addRegistry(const bb::Address bbAddress, reg::Regi
 	if (!p)
 		return false;
 
-	new (&p->reg[REG_ENTRY]) reg::Registry(std::move(src));
+	p->reg[REG_ENTRY] = std::move(src);
 	return true;
 }
 
