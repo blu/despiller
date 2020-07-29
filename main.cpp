@@ -277,15 +277,17 @@ int main(int, char **)
 		assert(success);
 	}
 
-	putc('\n', stdout);
-	print(stdout, *graph.getRegistry(addrMain_0, REG_ENTRY), addrMain_0);
-	print(stdout, *graph.getRegistry(addrMain_0, REG_EXIT), addrMain_0 + graph.getBasicBlock(addrMain_0)->getSequence().size() - 1);
-
-	print(stdout, *graph.getRegistry(addrFoo, REG_ENTRY), addrFoo);
-	print(stdout, *graph.getRegistry(addrFoo, REG_EXIT), addrFoo + graph.getBasicBlock(addrFoo)->getSequence().size() - 1);
-
-	print(stdout, *graph.getRegistry(addrMain_1, REG_ENTRY), addrMain_1);
-	print(stdout, *graph.getRegistry(addrMain_1, REG_EXIT), addrMain_1 + graph.getBasicBlock(addrMain_1)->getSequence().size() - 1);
+	// print out the BB registries
+	lastEnd = addr_invalid;
+	for (const auto it : graph) {
+		// print a gap at each address discontinuity
+		const Address bbStart = it.getStartAddress();
+		if (bbStart != lastEnd)
+			fputc('\n', stdout);
+		lastEnd = bbStart + Address(it.getSequence().size());
+		print(stdout, *graph.getRegistry(bbStart, REG_ENTRY), bbStart);
+		print(stdout, *graph.getRegistry(bbStart, REG_EXIT), lastEnd - 1);
+	}
 
 	return 0;
 }
