@@ -262,7 +262,7 @@ int main(int, char **)
 	}
 	// set up at-entry registry for 'int foo()' and compute at-exit registry
 	{
-		Registry reg(*graph.getRegistry(addrMain_0, REG_EXIT));
+		Registry reg(graph.getRegistry(addrMain_0)[order_exit]);
 		bool success = graph.setRegistry(addrFoo, std::move(reg));
 		assert(success);
 		success = graph.calcRegistry(addrFoo);
@@ -270,7 +270,7 @@ int main(int, char **)
 	}
 	// set up at-entry registry for 'int main():past-callee' and compute at-exit registry
 	{
-		Registry reg(*graph.getRegistry(addrFoo, REG_EXIT));
+		Registry reg(graph.getRegistry(addrFoo)[order_exit]);
 		bool success = graph.setRegistry(addrMain_1, std::move(reg));
 		assert(success);
 		success = graph.calcRegistry(addrMain_1);
@@ -285,8 +285,9 @@ int main(int, char **)
 		if (bbStart != lastEnd)
 			fputc('\n', stdout);
 		lastEnd = bbStart + Address(it.getSequence().size());
-		print(stdout, *graph.getRegistry(bbStart, REG_ENTRY), bbStart);
-		print(stdout, *graph.getRegistry(bbStart, REG_EXIT), lastEnd - 1);
+		const Registry* const reg = graph.getRegistry(bbStart);
+		print(stdout, reg[order_entry], bbStart);
+		print(stdout, reg[order_exit], lastEnd - 1);
 	}
 
 	return 0;
