@@ -1,6 +1,8 @@
 # despiller
 A proof of concept of a code-optimisation technique, hereby referred to as *de-spilling of registers*, in a fake ISA.
 
+*This is a work in progress, far from feature-complete status. Once the project reaches sufficient maturity this message will be removed.*
+
 # overview
 De-spilling is a codegen optimisaiton technique, which addresses post-factum excessive spilling or registers. The latter can come from two sources:
 
