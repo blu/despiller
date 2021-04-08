@@ -1,7 +1,11 @@
 	.arch armv8-a
 
 	.global string_x16
+	.global string_x16_1
+	.global string_x16_2
 	.global string_x32
+	.global string_x64
+	.global string_x64_1
 	.text
 
 // convert x16 to string
@@ -78,7 +82,7 @@ string_x16_2:
 	movi    v4.8b, 'a' - 0xa
 	movi    v5.8b, 0xa
 	movi    v6.8b, 0xf
-	mov     v0.4h[0], w1
+	fmov    s0, w1
 	ushr    v1.8b, v0.8b, 4
 	and     v0.8b, v0.8b, v6.8b
 	zip1    v0.8b, v1.8b, v0.8b // we write the result via a single store op, so correct for digit order, part two: swap nibble order
@@ -99,7 +103,7 @@ string_x32:
 	movi    v4.8b, 'a' - 0xa
 	movi    v5.8b, 0xa
 	movi    v6.8b, 0xf
-	mov     v0.2s[0], w1
+	fmov    s0, w1
 	ushr    v1.8b, v0.8b, 4
 	and     v0.8b, v0.8b, v6.8b
 	zip1    v0.8b, v1.8b, v0.8b // we write the result via a single store op, so correct for digit order, part two: swap nibble order
@@ -120,7 +124,7 @@ string_x64:
 	movi    v4.16b, 'a' - 0xa
 	movi    v5.16b, 0xa
 	movi    v6.16b, 0xf
-	mov     v0.d[0], x1
+	fmov    d0, x1
 	ushr    v1.8b, v0.8b, 4
 	and     v0.8b, v0.8b, v6.8b
 	zip1    v0.16b, v1.16b, v0.16b // we write the result via a single store op, so correct for digit order, part two: swap nibble order
@@ -138,7 +142,7 @@ string_x64:
 string_x64_1:
 	rev     x1, x1 // we write the result via a single store op, so correct for digit order, part one: swap octet order
 	movi    v6.16b, 0xf
-	mov     v0.d[0], x1
+	fmov    d0, x1
 	movi    v3.16b, '0' - 0x0
 	movi    v4.16b, 'a' - 0xa
 	movi    v5.16b, 0xa
