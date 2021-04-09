@@ -179,8 +179,8 @@ inline const char* strFromOpcode(const Opcode op)
 }
 
 extern "C" {
-	void string_x16(void*, uint32_t);
-	void string_x32(void*, uint32_t);
+	void string_x16(void*, uint32_t) asm ("string_x16");
+	void string_x32(void*, uint32_t) asm ("string_x32");
 }
 
 static size_t strFromInstr(const Instr& instr, char* buffer, const size_t bufferSize)
