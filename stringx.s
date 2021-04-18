@@ -1,5 +1,6 @@
 	.arch armv8-a
 
+	.global string_x8
 	.global string_x16
 	.global string_x16_1
 	.global string_x16_2
@@ -7,6 +8,26 @@
 	.global string_x64
 	.global string_x64_1
 	.text
+
+// convert x8 to string
+// x0: output buffer
+// w1: value to convert, bits [7:0]
+// clobbers: x2, x3, x4, x5
+	.align 4
+string_x8:
+	mov     w4, '0' - 0x0
+	mov     w5, 'a' - 0xa
+	ubfx    w2, w1,  4, 4
+	and     w1, w1, 15
+	cmp     w2, 0xa
+	csel    w3, w4, w5, LO
+	cmp     w1, 0xa
+	csel    w4, w4, w5, LO
+	add     w2, w2, w3
+	strb    w2, [x0, 0]
+	add     w1, w1, w4
+	strb    w1, [x0, 1]
+	ret
 
 // convert x16 to string
 // x0: output buffer
